@@ -8,7 +8,7 @@
 
 新增与 `github`、`feishu` 并列的 **`gitea` Source kind**，只通过 Gitea 官方 CLI `gt`（gitea-cli ≥ 2.0）与实例交互；Gitea **可以单独使用**（不需要任何 GitHub 账号），且 Gitea 工单是**完整公民**。
 
-动机是可维护性：`forgejo-17` 分支用自维护的 REST 封装（约 580 行）适配 Gitea，个人维护的封装会随上游漂移；官方 CLI 的字段契约由上游承担。
+动机是可维护性：手写的 REST 封装会随上游漂移，官方 CLI 的字段契约由上游承担。同类平台优先用官方客户端，不自己维护传输层。
 
 ## 2. 目标
 
@@ -20,7 +20,6 @@
 
 ## 3. 非目标
 
-- **Forgejo**：`gt` 不支持 Forgejo，本 kind 只服务 Gitea ≥ 28。`forgejo-17` 分支与本文无关。
 - **自动合并**：`main` 的 `github` kind 不含合并闸门，本 kind 保持同等能力（`gt pr merge --match-head-commit` 留作后续）。
 - **标记已读**：不调用 `gt notification mark-read`。`ponytail: 不标已读，收件箱会一直显示未读；日后要清理再加`。
 - **worker 的 `gh` 兼容壳**：gitea worker 用 `gt`，不伪装成 `gh`。
