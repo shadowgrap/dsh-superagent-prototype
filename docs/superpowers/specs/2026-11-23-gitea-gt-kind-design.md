@@ -52,8 +52,7 @@
 | 行内评论**没有父指针**；线程根 = 同一文件同一行的最早一条 | 回复前自己算根 |
 | raw API 的行内评论 `line` 常为 `null`，`gt pr review comments` 给真实 `line` | 根匹配用 gt 字段 |
 | 行内评论 `html_url` 是 `/pulls/<n>#issuecomment-<id>` | 链接按此渲染 |
-| `gt pr checks` 合并 Actions 与 commit status；**exit 1 = 有失败、8 = 有待定、0 = 通过** | CI 单一来源 |
-| **exit 1 的歧义用流区分**：CI 失败 → stdout 有 JSON、stderr 空；命令失败 → stdout 空、stderr 有 JSON；未知 flag → exit 2 | 无需解析错误文本 |
+| Gitea Actions 的运行**以 commit status 形式出现**：`/commits/{sha}/statuses` 能读到，`context` 例如 `verify3 / check (push)`，`target_url` 指向 Actions run | CI 只需读 statuses；Gitea 没有 check-runs 可合流 |
 | 检查状态接受 `warning` | 未知状态「不失败、不通过」 |
 | `gt pr review list --json` 提供 `submitted_at`，无 `created_at`/`updated_at` | review 版本 = 提交时间 |
 | resolve / unresolve **不移动**评论的 `updated_at` | 无需特判 |
@@ -84,7 +83,7 @@
 
 | 文件 | 职责 |
 |---|---|
-| `src/infra/gt.ts` | `Gt` 传输：cli 路径、`GITEA_CLI_CONFIG_DIR`、`--host`/`-R`/`--no-input`/`GITEA_CLI_ERROR_FORMAT=json`、超时 90s、错误 JSON → `CliError`（code 取 `status`）；`checks()` 区分 CI 失败与命令失败 |
+| `src/infra/gt.ts` | `Gt` 传输：cli 路径、`GITEA_CLI_CONFIG_DIR`、`--host`/`-R`/`--no-input`/`GITEA_CLI_ERROR_FORMAT=json`、超时、错误 JSON → `CliError`；`api()`/`pages()` 是 `gh api` 的对应物，路径仍限制在配置的仓库内 |
 | `src/deployment-gitea.ts` | `GiteaAccountsSchema` 与 `resolveDeploymentGitea`（不写进 `deployment.ts`） |
 | `src/sources/gitea.ts` | kind 描述符、配置 schema、轮次循环 |
 | `src/sources/gitea-trigger.ts` | 线程/触发 ID、地址、`mentions`、人机判定 |
@@ -144,8 +143,8 @@ const GiteaConfigSchema = z.object({
 | 通知详情 | issue/PR 正文 + 三路评论 | `gt issue view`/`gt pr view` + `gt api repos/{o}/{r}/issues/<n>/comments?limit=50&page=` + `gt pr review comments <n>` + `gt pr review list <n>` |
 | 事件流：新 Issue / 新 PR | `issues?state=all` | `gt issue list --kind all --state all --since=<cursor>` |
 | 事件流：评论 | `issues/comments` + `pulls/comments` | `gt api repos/{o}/{r}/issues/comments?since=&limit=50`；**行内评论无仓库级流**，只能经通知与线程轮询 |
-| 已订阅线程 | 逐个 PR 拉检查 | `gt pr view` + `gt pr checks`（§6.4.3） |
-| 默认分支 CI | default_branch → commit → checks | `gt repo view --json default_branch,actions_enabled` + `gt run list -b <branch> --json=branch,commit,status,conclusion` |
+| 已订阅线程 | `pullChecks` 读 check-runs + statuses | `gt pr view` + CI 快照（§6.4.3） |
+| 默认分支 CI | default_branch → commit → checks | `gt repo view --json default_branch,actions_enabled` 取分支，`gt api repos/{o}/{r}/commits/<branch>` 取 sha，再走**同一个** CI 快照 |
 | 失败重试 | `KV.github.retries` 24h 窗口 | 同构，键为 `KV.gitea.*` |
 
 `observeComments` 文案如实：打开后覆盖**会话评论**；行内评审评论始终只经通知送达。
@@ -163,10 +162,14 @@ Gitea 的通知在事件后约 6 秒才写入（GitHub 22–24 秒），游标�
 
 **6.4.3 检查与 CI 事实**
 
-- 数据源只有 `gt pr checks --json=name,state,sha,url`。
-- 退出码：0 通过 / 8 待定 / 1 有失败；**exit 1 且 stderr 有 JSON = 命令失败**。
-- 状态：`success` 通过、`pending` 待定、`failure`/`error` 失败；其它（含 `warning`）既不失败也不通过。
-- `unavailable` 用 `gt repo view --json actions_enabled` + 检查列表为空判定。
+与 `github` kind 走同一条路（`github-read.ts` 的 `pullChecks`），只是换成 gt 的 api 通道：
+
+- 读 `gt api repos/{o}/{r}/commits/{sha}/statuses`，**按 `context` 取最新一条**。
+- `checks: []`：Gitea 没有 check-runs；Actions 的运行就在 statuses 里。
+- 状态映射：`success` 通过、`pending` 待定、`failure`/`error` 失败；其它（含 `warning`）既不失败也不通过。
+- PR 与默认分支 CI 共用这一个快照函数——只要一个 sha。
+- `unavailable` 用 `gt repo view --json actions_enabled` + 快照为空判定。
+- **不使用 `gt pr checks`**：它是 CLI 子命令，而 github kind 读的是 API；用它还要额外处理 exit 1 的两种含义（见 §7 决策规则）。
 
 ### 6.5 完整公民：按 kind 分派
 
@@ -225,6 +228,7 @@ interface SourceKind { repository?: RepositorySource }
 2. **挂点最小**：每个既有文件的改动控制在几行，能放新文件的都放新文件（`deployment-gitea.ts`）。
 3. **分派收敛**：按 kind 取实现统一走 `repositoryOf(sources, kindId)`。
 4. **合并用 merge 不用 rebase**；合并后跑三态回归（只 github / 只 gitea / 两者）。
+5. **决策规则**：`gt` 若能用**不同做法**覆盖 `gh` 已有的能力，先验证新旧差异并报告，由操作员决定采用哪个，不默认采用新做法。
 
 侵入点清单（约 60–80 行，散在 13 个文件）：
 
@@ -254,7 +258,7 @@ interface SourceKind { repository?: RepositorySource }
 
 ## 10. 测试
 
-- 单元：触发映射、地址、marker 幂等、检查状态映射（含 `warning`）、2 分钟重叠的重复读去重、exit 1 两种含义、行内评论根计算、`threadNumber`、共享 `claimPull` 在两个 kind 上行为一致。
+- 单元：触发映射、地址、marker 幂等、检查状态映射（含 `warning`）、statuses 按 context 取最新、2 分钟重叠的重复读去重、行内评论根计算、`threadNumber`、共享 `claimPull` 在两个 kind 上行为一致。
 - schema 守卫：读 `gt schema` 断言消费的字段存在。
 - 三态回归：github 单独 / gitea 单独 / 两者同时，都能起且 `ticketCard` 显示 PR；`giteaProblem` 只影响 gitea。
 - live（可选）：`tests/gitea-live.spec.ts`，覆盖通知→触发、评论写入、行内回复（含根）、`pr checks` 退出码、`run list`。
