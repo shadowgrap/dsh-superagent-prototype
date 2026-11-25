@@ -6,8 +6,9 @@ import { mentions, reviewPlace } from './github-trigger.ts'
 
 export const SOURCE = 'gitea'
 /** Gitea reply address: the Issue or pull request conversation of `number`. */
-export const giteaChannel = (number: number, url?: string): ChannelRef =>
-  ({ source: SOURCE, thread: `${SOURCE}:${number}`, address: { number: String(number), ...(url ? { url } : {}) } })
+export const giteaChannel = (number: number, url?: string, root?: number): ChannelRef =>
+  ({ source: SOURCE, thread: `${SOURCE}:${number}`,
+    address: { number: String(number), ...(url ? { url } : {}), ...(root !== undefined ? { root: String(root) } : {}) } })
 /** The web page of an Issue or pull request of `repository` on the instance `baseUrl` names, which may carry a subpath. */
 export const giteaPage = (baseUrl: string, repository: string, number: number, pr = false): string =>
   `${baseUrl.replace(/\/+$/, '')}/${repository}/${pr ? 'pulls' : 'issues'}/${number}`
@@ -75,7 +76,7 @@ export function commentTrigger(comment: GiteaComment, ref: PullRef, kind: 'conve
   return { id, source: SOURCE, threads: [{ source: SOURCE, id: String(ref.number) }], ...author(comment.user, agent, bots), at,
     text: commentText(comment, kind),
     ...(mentions(comment.body ?? '', agent) ? { addressed: 'mention' as const } : {}),
-    channel: giteaChannel(ref.number, comment.html_url ?? undefined),
+    channel: giteaChannel(ref.number, comment.html_url ?? undefined, kind === 'inline' ? inlineRootId : undefined),
     ...(comment.html_url ?? ref.url ? { url: comment.html_url ?? ref.url } : {}),
     meta: { number: ref.number, isPr: ref.isPr, ...(ref.prAuthor ? { prAuthor: ref.prAuthor } : {}), commentId: comment.id, kind,
       ...comment.path ? { path: comment.path, line: comment.line ?? comment.original_line ?? null } : {},

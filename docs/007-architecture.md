@@ -368,7 +368,10 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `src/sources/github-pull.ts` | The pull request rules: which pull requests a Ticket follows (`claimPull`, `observePull`), the closes it reports to the Engine, and `pullEndNotices`, the chat notice of a Ticket that ended merged or closed |
 | `src/sources/github-channel.ts` | The GitHub Channel: comments and review thread replies, `sent` or `gone` |
 | `src/sources/github-read.ts` | CI snapshots, repository reads, the `github/` resources, and `githubThreadContext`: an Issue's or pull request's conversation by page |
-| `src/sources/gitea-read.ts` | The Gitea reads a poll round needs: a commit's CI snapshot, the newest status of each context |
+| `src/deployment-gitea.ts` | The Gitea Source's settings and its startup checks: gt 2.0, Gitea 28, a signed-in account whose token reads notifications, and a repository it can push to |
+| `src/sources/gitea-trigger.ts` | Gitea comments, reviews, opened Issues and pull requests, and CI changes as Triggers, and Gitea addresses |
+| `src/sources/gitea-channel.ts` | The Gitea Channel: a conversation comment or an inline review reply, marked so a retry sends it once, `sent` or `gone` |
+| `src/sources/gitea-read.ts` | The Gitea reads a poll round needs: a pull request, a conversation's comments, a commit's CI snapshot, and one repository file |
 | `src/sources/feishu.ts` | The Feishu kind and plugin entry, exported as `./feishu-watch` |
 | `src/sources/feishu-trigger.ts` | Feishu messages as Triggers, by one rule for live events, history pages and topic pages |
 | `src/sources/feishu-loops.ts` | The Feishu loops: the event consumer, history recovery, chat names and polling of subscribed topics |
@@ -409,7 +412,9 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `tests/stage.spec.ts` | The Ticket stages, row by row |
 | `tests/policy.spec.ts` | Source scope, the gate, the admission table, Mandate revalidation, the Policy version, settings migrations and assessment outcomes |
 | `tests/registry.spec.ts` | `SourceRegistry`: instances, validation, Policy parts, Channels and Thread context |
-| `tests/gt.spec.ts`, `tests/gitea-read.spec.ts` | The `gt` transport: instance flags and config directory, repository-scoped API paths, rejected paths, flattened pages; a commit's CI snapshot, newest status per context |
+| `tests/gt.spec.ts`, `tests/gitea-read.spec.ts` | The `gt` transport: instance flags and config directory, repository-scoped API paths, rejected paths, flattened pages; a pull request read, comment pages, a commit's CI snapshot, a repository file |
+| `tests/gitea-trigger.spec.ts`, `tests/gitea-channel.spec.ts` | Gitea addresses, people against the automated accounts, comment and review Triggers, inline roots, CI Triggers; the Channel's marker, inline reply, and `gone` |
+| `tests/deployment-gitea.spec.ts` | The Gitea settings schema and every startup check, each naming where it is fixed |
 | `tests/sources.spec.ts` | The Feishu and GitHub Sources on a `SourceContext`: translation, polls and read positions, the pull request rules, health |
 | `tests/commands.spec.ts` | CLI calls as the deployment's accounts, the Channels' answers, and repository-scoped GitHub calls |
 | `tests/feishu-read.spec.ts`, `tests/github-read.spec.ts` | Feishu and GitHub reads |

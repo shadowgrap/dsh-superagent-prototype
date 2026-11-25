@@ -53,6 +53,7 @@ export const SETUP_FIELDS: Readonly<Record<string, readonly string[]>> = { githu
 export interface Deployment extends Machine {
   repository: string
   github: { cli: string; login: string; noreply: string }
+  gitea?: import('./deployment-gitea.ts').GiteaDeployment
   feishu?: FeishuBot
 }
 export interface FeishuBot { cli: string; appId: string; brand: 'feishu' | 'lark'; botId: string; name: string }
