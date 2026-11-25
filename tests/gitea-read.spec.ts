@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Gt } from '../src/infra/gt.ts'
-import { ciSnapshot, conversationComments, readCi, readPath, readPull } from '../src/sources/gitea-read.ts'
+import { ciSnapshot, conversationComments, readCi, readPath, readPull, reviewComments, reviews } from '../src/sources/gitea-read.ts'
+import { commentTrigger } from '../src/sources/gitea-trigger.ts'
 
 const host = 'https://gitea.example.com'
 const repository = 'o/r'
@@ -10,7 +11,8 @@ function fake(answer: (path: string, flags: string[]) => string) {
   const gt = new Gt({ cli: 'gt', host, repository, configDir: '/tmp/gt' }, async (_program, args) => {
     const at = args.findIndex(argument => argument.startsWith('repos/'))
     calls.push(args)
-    return answer(at < 0 ? '' : args[at]!.slice(`repos/${repository}/`.length), args.slice(at + 1))
+    if (at < 0) return answer(args.slice(args.indexOf('--no-input') + 1).join(' '), args)
+    return answer(args[at]!.slice(`repos/${repository}/`.length), args.slice(at + 1))
   })
   return { calls, gt }
 }
@@ -80,6 +82,24 @@ describe('gitea conversation comments', () => {
     expect(await conversationComments(gt, 7)).toHaveLength(51)
     expect(calls).toHaveLength(2)
     expect(calls[1]).toContain(`repos/${repository}/issues/7/comments?limit=50&page=2`)
+  })
+})
+
+describe('gitea native review reads', () => {
+  it('maps a review\'s own field names, and folds its verdict into the Trigger text', async () => {
+    const { calls, gt } = fake(() => JSON.stringify([{ id: 4, body: 'fine', author: 'carol', state: 'APPROVED',
+      submitted_at: '2026-11-24T10:00:00Z', commit: 'abc123', url: `${host}/${repository}/pulls/7#issuecomment-4` }]))
+    const [review] = await reviews(gt, 7)
+    expect(review).toMatchObject({ id: 4, user: { login: 'carol' }, state: 'APPROVED', commit_id: 'abc123', submitted_at: '2026-11-24T10:00:00Z' })
+    expect(calls[0]!.join(' ')).toContain('pr review list 7 --limit=50 --page=1')
+    expect(commentTrigger(review!, { number: 7, isPr: true }, 'review', 'fiume_bot', []).text).toBe('APPROVED review of commit abc123\n\nfine')
+  })
+  it('keeps the line gt reports for an inline comment, and reads it old line as the original one', async () => {
+    const { calls, gt } = fake(() => JSON.stringify([{ id: 31, body: 'why?', author: 'dave', path: 'src/app.ts', line: 12, old_line: 9,
+      created_at: '2026-11-24T12:00:00Z', updated_at: '2026-11-24T12:00:00Z', url: `${host}/${repository}/pulls/7#issuecomment-31` }]))
+    const [comment] = await reviewComments(gt, 7)
+    expect(comment).toMatchObject({ id: 31, user: { login: 'dave' }, path: 'src/app.ts', line: 12, original_line: 9 })
+    expect(calls[0]!.join(' ')).toContain('pr review comments 7 --limit=50 --page=1')
   })
 })
 

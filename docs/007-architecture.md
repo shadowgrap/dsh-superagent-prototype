@@ -371,7 +371,7 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `src/deployment-gitea.ts` | The Gitea Source's settings and its startup checks: gt 2.0, Gitea 28, a signed-in account whose token reads notifications, and a repository it can push to |
 | `src/sources/gitea-trigger.ts` | Gitea comments, reviews, opened Issues and pull requests, and CI changes as Triggers, and Gitea addresses |
 | `src/sources/gitea-channel.ts` | The Gitea Channel: a conversation comment or an inline review reply, marked so a retry sends it once, `sent` or `gone` |
-| `src/sources/gitea-read.ts` | The Gitea reads a poll round needs: a pull request, a conversation's comments, a commit's CI snapshot, and one repository file |
+| `src/sources/gitea-read.ts` | The Gitea reads a poll round needs: a pull request, a conversation's comments, its reviews and inline review comments, a commit's CI snapshot, and one repository file |
 | `src/sources/feishu.ts` | The Feishu kind and plugin entry, exported as `./feishu-watch` |
 | `src/sources/feishu-trigger.ts` | Feishu messages as Triggers, by one rule for live events, history pages and topic pages |
 | `src/sources/feishu-loops.ts` | The Feishu loops: the event consumer, history recovery, chat names and polling of subscribed topics |
