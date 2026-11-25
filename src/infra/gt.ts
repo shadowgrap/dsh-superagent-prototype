@@ -7,6 +7,7 @@ export type GtRun = (program: string, args: string[], env: Record<string, string
 /** A path that would leave the configured repository. */
 const outside = (path: string): boolean => /^\/|^[a-z]+:|(^|\/)\.\.?(\/|\?|$)/i.test(path)
 
+/** Reads one Gitea repository through the `gt` CLI, as `Commands` does for GitHub through `gh`. */
 export class Gt {
   constructor(private readonly connection: GiteaConnection, private readonly run: GtRun) {}
 
