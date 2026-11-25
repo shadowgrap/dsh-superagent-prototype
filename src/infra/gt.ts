@@ -29,6 +29,11 @@ export class Gt {
     return this.call(['api', `repos/${repository}${path ? `/${path}` : ''}`, ...flags])
   }
 
+  /** Reads an API path inside the configured repository and parses its JSON against `schema`. */
+  async apiJson<T>(schema: z.ZodType<T>, path: string, ...flags: string[]): Promise<T> {
+    return schema.parse(JSON.parse(await this.api(path, ...flags)))
+  }
+
   /** Reads every page of an API list, skipping items that fail schema validation. */
   async pages<T>(item: z.ZodType<T>, path: string, tally?: Tally): Promise<T[]> {
     const pages = z.array(z.array(z.unknown())).parse(JSON.parse(await this.api(path, '--paginate', '--slurp')))
