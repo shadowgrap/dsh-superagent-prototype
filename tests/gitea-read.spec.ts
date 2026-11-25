@@ -27,10 +27,17 @@ describe('gitea CI snapshot', () => {
       { context: 'lint', state: 'pending' }, { context: 'test', state: 'failure' }] })
   })
   it('reads a commit\'s statuses by every page of the API', async () => {
-    const { calls, gt } = fake(() => JSON.stringify([[{ id: 1, context: 'test', status: 'success' }, { id: 2, context: 'test', status: 'failure' }]]))
+    const { calls, gt } = fake(() => JSON.stringify([{ id: 1, context: 'test', status: 'success' }, { id: 2, context: 'test', status: 'failure' }]))
     expect(await readCi(gt, 'abc123')).toEqual({ head: 'abc123', checks: [], statuses: [{ context: 'test', state: 'failure' }] })
-    expect(calls[0]).toContain(`repos/${repository}/commits/abc123/statuses`)
-    expect(calls[0]).toContain('--paginate')
+    expect(calls[0]).toContain(`repos/${repository}/commits/abc123/statuses?limit=50&page=1`)
+    expect(calls[0]).not.toContain('--paginate')
+  })
+  it('reads the statuses page by page, since the list carries no Link header to follow', async () => {
+    const { calls, gt } = fake((_path, flags) => JSON.stringify(flags.includes('page=1') || calls.length === 1
+      ? Array.from({ length: 50 }, (_, index) => ({ id: index + 1, context: 'test', status: 'success' }))
+      : [{ id: 99, context: 'test', status: 'failure' }]))
+    expect((await readCi(gt, 'abc')).statuses).toEqual([{ context: 'test', state: 'failure' }])
+    expect(calls).toHaveLength(2)
   })
 })
 

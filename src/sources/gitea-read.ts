@@ -25,10 +25,23 @@ const PAGE_LIMIT = 50
 /** ponytail: 20 pages is a thousand comments; a longer conversation needs the cursor the caller never asked for. */
 const MAX_PAGES = 20
 const StatusSchema = z.looseObject({ id: z.number().optional(), context: z.string(), status: z.string() })
+/**
+ * Reads a list by page until one is short. Gitea's list endpoints carry no `Link` header, so `--paginate` cannot be relied
+ * on as it is for GitHub; every page names its number and limit instead.
+ */
+async function paged<T>(gt: Gt, item: z.ZodType<T>, path: (page: number) => string, tally?: Tally): Promise<T[]> {
+  const items: T[] = []
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const listed = await gt.apiJson(z.array(z.unknown()), path(page))
+    items.push(...validItems(item, listed, tally))
+    if (listed.length < PAGE_LIMIT) break
+  }
+  return items
+}
 
 /** Reads the commit statuses of `head`; an Actions run arrives as a status, so there is no check run to merge in. */
 export async function readCi(gt: Gt, head: string, tally?: Tally): Promise<CiSnapshot> {
-  return ciSnapshot(head, await gt.pages(StatusSchema, `commits/${head}/statuses`, tally))
+  return ciSnapshot(head, await paged(gt, StatusSchema, page => `commits/${head}/statuses?limit=${PAGE_LIMIT}&page=${page}`, tally))
 }
 
 /** A pull request as Gitea's API returns it, under the field names the github kind's `Pull` uses. */
@@ -45,13 +58,7 @@ export const readPull = async (gt: Gt, number: number): Promise<GiteaPull> =>
 
 /** Every comment of a conversation; inline review comments have no repository-wide stream and arrive by notification instead. */
 export async function conversationComments(gt: Gt, number: number, tally?: Tally): Promise<GiteaComment[]> {
-  const comments: GiteaComment[] = []
-  for (let page = 1; page <= MAX_PAGES; page++) {
-    const listed = await gt.apiJson(z.array(z.unknown()), `issues/${number}/comments?limit=${PAGE_LIMIT}&page=${page}`)
-    comments.push(...validItems(CommentSchema, listed, tally))
-    if (listed.length < PAGE_LIMIT) break
-  }
-  return comments
+  return paged(gt, CommentSchema, page => `issues/${number}/comments?limit=${PAGE_LIMIT}&page=${page}`, tally)
 }
 
 /** Reads a non-hidden file of the repository; hidden entries and `node_modules` are rejected as for the github kind. */
