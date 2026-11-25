@@ -22,7 +22,7 @@ export function ciSnapshot(head: string, statuses: readonly CiStatus[]): CiSnaps
 
 /** Gitea caps a response at 50 items, and its comment lists carry no `Link`, so pages are read until one is short. */
 const PAGE_LIMIT = 50
-/** ponytail: 20 pages is a thousand comments; a longer conversation needs the cursor the caller never asked for. */
+/** Most pages one list read follows; a longer list fails the read so its cursor stays where it was, as the tea fork decides. */
 const MAX_PAGES = 20
 const StatusSchema = z.looseObject({ id: z.number().optional(), context: z.string(), status: z.string() })
 /**
@@ -34,9 +34,10 @@ async function paged<T>(gt: Gt, item: z.ZodType<T>, path: (page: number) => stri
   for (let page = 1; page <= MAX_PAGES; page++) {
     const listed = await gt.apiJson(z.array(z.unknown()), path(page))
     items.push(...validItems(item, listed, tally))
-    if (listed.length < PAGE_LIMIT) break
+    if (listed.length < PAGE_LIMIT) return items
   }
-  return items
+  // Failing keeps the caller's cursor where it was, instead of stepping it past items this read never saw.
+  throw new Error(`Gitea lists more than ${MAX_PAGES * PAGE_LIMIT} items for ${path(1).split('?')[0]}`)
 }
 
 /** Reads the commit statuses of `head`; an Actions run arrives as a status, so there is no check run to merge in. */

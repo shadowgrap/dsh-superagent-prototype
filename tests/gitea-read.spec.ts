@@ -84,9 +84,9 @@ describe('gitea conversation comments', () => {
 })
 
 describe('gitea page cap', () => {
-  it('stops after twenty pages however full they are', async () => {
+  it('fails a list longer than twenty pages rather than returning part of it', async () => {
     const { calls, gt } = fake(() => JSON.stringify(Array.from({ length: 50 }, (_, index) => comment(index + 1))))
-    expect(await conversationComments(gt, 7)).toHaveLength(1000)
+    await expect(conversationComments(gt, 7)).rejects.toThrow('Gitea lists more than 1000 items for issues/7/comments')
     expect(calls).toHaveLength(20)
   })
 })
