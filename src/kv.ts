@@ -49,6 +49,15 @@ export const KV = {
     branchCi: record<{ branch?: string; failures?: string[]; revision: number }>('github-branch-ci'),
     ci: family<{ fingerprint: string; revision: number }, [number: number]>('github-ci:') },
   /**
+   * Gitea Source: notification cursor and pending retries; per-Issue/PR read cursor shared by notification and polled reads;
+   * per-stream cursor and start times by kind; default-branch CI state; and per-PR CI fingerprint and revision.
+   */
+  gitea: { since: record<string>('gitea-since'), retries: record<Record<string, Retry>>('gitea-retry'),
+    cursor: family<string, [number: number]>('gitea-cursor:'),
+    stream: family<{ since: string; started: Record<string, string> }, [stream: string]>('gitea-stream:'),
+    branchCi: record<{ branch?: string; failures?: string[]; revision: number }>('gitea-branch-ci'),
+    ci: family<{ fingerprint: string; revision: number }, [number: number]>('gitea-ci:') },
+  /**
    * Feishu Source: known chats (`true` for direct messages); per-chat history cursor and active topics mapped from topic ID
    * to last-seen timestamp; and per-polled-thread seen message IDs and initialization flag.
    */
